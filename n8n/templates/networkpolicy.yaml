@@ -1,0 +1,1 @@
+{{- include "arkhadia-common.networkPolicy.manifest" (dict "ctx" . "name" (printf "%s-n8n" (include "n8n-platform.fullname" .)) "selectorLabels" (include "n8n-platform.n8nSelectorLabels" .)) }}

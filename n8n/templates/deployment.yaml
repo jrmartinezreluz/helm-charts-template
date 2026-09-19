@@ -1,0 +1,108 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "n8n-platform.fullname" . }}
+  labels:
+    {{- include "n8n-platform.labels" . | nindent 4 }}
+    app.kubernetes.io/component: n8n
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "n8n-platform.n8nSelectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "n8n-platform.n8nSelectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "arkhadia-common.serviceAccountName" . }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automount | default false }}
+      securityContext:
+        {{- include "arkhadia-common.podSecurityContext" . | nindent 8 }}
+      initContainers:
+        {{- if .Values.postgresql.enabled }}
+        - name: wait-for-postgres
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - until nc -z {{ include "n8n-platform.postgresHost" . }} 5432; do echo waiting for postgres; sleep 2; done;
+        {{- end }}
+        {{- if .Values.persistence.enabled }}
+        - name: volume-permissions
+          image: busybox:1.36
+          command: ["sh", "-c", "chown 1000:1000 /data"]
+          securityContext:
+            runAsNonRoot: false
+            runAsUser: 0
+          volumeMounts:
+            - name: n8n-data
+              mountPath: /data
+        {{- end }}
+      containers:
+        - name: n8n
+          image: "{{ include "arkhadia-common.image" .Values.image }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- include "arkhadia-common.containerSecurityContext" . | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "n8n-platform.fullname" . }}-config
+            {{- if .Values.platform.externalSecrets.enabled }}
+            - secretRef:
+                name: {{ include "n8n-platform.fullname" . }}-env
+            {{- end }}
+          env:
+            - name: DB_POSTGRESDB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "n8n-platform.fullname" . }}-postgres
+                  key: DB_POSTGRESDB_USER
+            - name: DB_POSTGRESDB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "n8n-platform.fullname" . }}-postgres
+                  key: DB_POSTGRESDB_PASSWORD
+          {{- if .Values.probes.startup.enabled }}
+          startupProbe:
+            httpGet:
+              path: {{ .Values.probes.startup.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.probes.startup.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.startup.periodSeconds }}
+            failureThreshold: {{ .Values.probes.startup.failureThreshold }}
+          {{- end }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.probes.liveness.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
+            failureThreshold: {{ .Values.probes.liveness.failureThreshold }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.probes.readiness.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
+            failureThreshold: {{ .Values.probes.readiness.failureThreshold }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            {{- if .Values.persistence.enabled }}
+            - name: n8n-data
+              mountPath: /home/node/.n8n
+            {{- end }}
+      volumes:
+        {{- if .Values.persistence.enabled }}
+        - name: n8n-data
+          persistentVolumeClaim:
+            claimName: {{ include "n8n-platform.fullname" . }}
+        {{- end }}

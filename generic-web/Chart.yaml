@@ -1,0 +1,10 @@
+apiVersion: v2
+name: generic-web
+description: Reusable HTTP app — Deployment, Service, Ingress, TLS, optional ESO, SA, PDB, HPA, NetworkPolicy
+type: application
+version: 0.2.0
+appVersion: "1.0.0"
+dependencies:
+  - name: arkhadia-common
+    version: "0.1.1"
+    repository: "file://../library/arkhadia-common"

@@ -1,0 +1,1 @@
+{{- include "arkhadia-common.hpa.manifest" (dict "ctx" . "targetName" (include "n8n-platform.fullname" .)) }}

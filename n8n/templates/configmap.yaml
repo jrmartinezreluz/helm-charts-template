@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "n8n-platform.fullname" . }}-config
+  labels:
+    {{- include "n8n-platform.labels" . | nindent 4 }}
+data:
+  DB_TYPE: postgresdb
+  DB_POSTGRESDB_HOST: {{ include "n8n-platform.postgresHost" . | quote }}
+  DB_POSTGRESDB_PORT: {{ .Values.externalDatabase.port | toString | quote }}
+  DB_POSTGRESDB_DATABASE: {{ .Values.externalDatabase.database | quote }}
+  N8N_PROTOCOL: {{ .Values.n8n.protocol | quote }}
+  N8N_PORT: {{ .Values.n8n.port | toString | quote }}
+  N8N_HOST: {{ .Values.platform.ingress.host | quote }}
+  N8N_EDITOR_BASE_URL: {{ printf "%s://%s" .Values.n8n.protocol .Values.platform.ingress.host | quote }}
+  WEBHOOK_URL: {{ printf "%s://%s/" .Values.n8n.protocol .Values.platform.ingress.host | quote }}
+  N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: {{ .Values.n8n.enforceSettingsFilePermissions | toString | quote }}
+  QUEUE_HEALTH_CHECK_ACTIVE: {{ .Values.n8n.queueHealthCheckActive | toString | quote }}
+  N8N_METRICS: {{ .Values.n8n.metrics | toString | quote }}
+  N8N_RUNNERS_ENABLED: {{ .Values.n8n.runnersEnabled | toString | quote }}

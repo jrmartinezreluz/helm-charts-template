@@ -1,0 +1,23 @@
+{{- if and (include "hotel.rolloutEnabled" .) (.Values.rollout.analysis.enabled) }}
+# Wired into the Rollout only when rollout.analysis.enabled=true.
+# Default is false: Prometheus hotel 5xx / P95 names are not confirmed.
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: {{ include "hotel.fullname" . }}-frontend-preview
+  labels:
+    {{- include "hotel.labels" . | nindent 4 }}
+    app.kubernetes.io/component: frontend
+spec:
+  metrics:
+    - name: blackbox-preview-success
+      interval: 1m
+      count: 3
+      successCondition: result == 1
+      failureLimit: 2
+      provider:
+        prometheus:
+          address: {{ .Values.rollout.analysis.prometheusAddress | quote }}
+          query: |
+            max(probe_success{job=~"blackbox.*", instance=~"{{ .Values.platform.ingress.previewHost }}.*"})
+{{- end }}

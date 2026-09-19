@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "blueGreen": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "activeSlot": { "type": "string", "enum": ["blue", "green"] }
+      }
+    },
+    "rollout": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "autoPromotionEnabled": { "type": "boolean" },
+        "scaleDownDelaySeconds": { "type": "integer", "minimum": 0 },
+        "previewReplicaCount": { "type": "integer", "minimum": 0 },
+        "analysis": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "prometheusAddress": { "type": "string" }
+          }
+        }
+      }
+    },
+    "backend": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "replicaCount": { "type": "integer", "minimum": 0 },
+        "image": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "repository": { "type": "string" },
+            "tag": { "type": "string" },
+            "digest": { "type": "string", "pattern": "^(sha256:[0-9a-f]{64})?$" },
+            "pullPolicy": { "type": "string" }
+          }
+        }
+      }
+    },
+    "frontend": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "replicaCount": { "type": "integer", "minimum": 0 },
+        "image": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "repository": { "type": "string" },
+            "tag": { "type": "string" },
+            "digest": { "type": "string", "pattern": "^(sha256:[0-9a-f]{64})?$" },
+            "pullPolicy": { "type": "string" }
+          }
+        }
+      }
+    },
+    "platform": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "ingress": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "host": { "type": "string" },
+            "previewHost": { "type": "string" },
+            "className": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}

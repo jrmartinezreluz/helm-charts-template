@@ -1,0 +1,164 @@
+replicaCount: 1
+
+image:
+  repository: n8nio/n8n
+  tag: "1.108.2"
+  digest: ""
+  pullPolicy: IfNotPresent
+
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+  automount: false
+
+# Applied to the n8n container. Not applied to the volume-permissions init
+# (needs root chown) or in-cluster PostgreSQL.
+podSecurityContext:
+  runAsNonRoot: true
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: false
+
+service:
+  type: ClusterIP
+  port: 5678
+
+persistence:
+  enabled: true
+  size: 5Gi
+  storageClass: local-path
+  accessModes:
+    - ReadWriteOnce
+
+postgresql:
+  enabled: true
+  image: postgres:16
+  serviceName: ""
+  persistence:
+    size: 5Gi
+    storageClass: local-path
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+
+externalDatabase:
+  enabled: false
+  host: ""
+  port: 5432
+  database: n8n
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: 1000m
+    memory: 2Gi
+
+probes:
+  startup:
+    enabled: false
+    path: /healthz
+    initialDelaySeconds: 0
+    periodSeconds: 5
+    failureThreshold: 60
+  liveness:
+    path: /healthz
+    initialDelaySeconds: 60
+    periodSeconds: 30
+    failureThreshold: 5
+  readiness:
+    path: /healthz/readiness
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    failureThreshold: 6
+
+# Recreate + single replica + in-cluster Postgres: not HA.
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+
+networkPolicy:
+  enabled: false
+  dns: true
+  # Workflows call arbitrary external APIs; do not default-deny egress.
+  allowAllEgress: true
+  ingress:
+    - from:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 5678
+
+topologySpread:
+  enabled: false
+  maxSkew: 1
+  topologyKey: topology.kubernetes.io/zone
+  whenUnsatisfiable: ScheduleAnyway
+
+podAntiAffinity:
+  enabled: false
+  topologyKey: kubernetes.io/hostname
+
+n8n:
+  protocol: https
+  port: 5678
+  enforceSettingsFilePermissions: true
+  queueHealthCheckActive: true
+  metrics: true
+  runnersEnabled: true
+
+platform:
+  internalDomain: example.internal
+
+  tls:
+    enabled: true
+    secretName: example-internal-wildcard-tls
+    certificate:
+      create: true
+      name: example-internal-wildcard
+      issuerRef:
+        name: example-internal-ca
+        kind: ClusterIssuer
+
+  ingress:
+    enabled: true
+    className: traefik
+    entrypoints: websecure
+    host: n8n-dev.example.internal
+    path: /
+    pathType: Prefix
+
+  externalSecrets:
+    enabled: true
+    refreshInterval: 1h
+    secretStoreRef:
+      name: aws-secrets-manager
+      kind: ClusterSecretStore
+    env:
+      remoteRef:
+        key: apps/n8n/dev/env
+    db:
+      remoteRef:
+        key: apps/n8n/dev/db

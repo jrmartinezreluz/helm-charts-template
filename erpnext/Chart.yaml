@@ -1,0 +1,14 @@
+apiVersion: v2
+name: erpnext
+description: Enterprise ERP example — Frappe workload wrapper, Traefik ingress, ESO secrets, internal TLS
+type: application
+version: 0.2.0
+appVersion: "15"
+dependencies:
+  - name: arkhadia-common
+    version: "0.1.1"
+    repository: "file://../library/arkhadia-common"
+  - name: erpnext
+    version: "7.0.159"
+    repository: https://helm.erpnext.com
+    condition: frappe.enabled

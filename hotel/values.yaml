@@ -1,0 +1,173 @@
+cluster:
+  name: cluster-nonprod
+
+# LEGACY: used only when rollout.enabled=false (slot Deployments).
+blueGreen:
+  activeSlot: blue
+
+# Argo Rollouts owns traffic. autoPromotionEnabled must be false in production.
+rollout:
+  enabled: true
+  autoPromotionEnabled: false
+  scaleDownDelaySeconds: 30
+  analysis:
+    enabled: false
+    # Not used unless analysis.enabled=true. Address not verified.
+    prometheusAddress: http://kube-prometheus-stack-prometheus.monitoring.svc:9090
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+  automount: false
+
+podSecurityContext:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: false
+
+backend:
+  replicaCount: 1
+  image:
+    repository: ""
+    tag: latest
+    digest: ""
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 300m
+      memory: 128Mi
+  probes:
+    path: /api/health
+    liveness:
+      initialDelaySeconds: 10
+      periodSeconds: 20
+      failureThreshold: 3
+    readiness:
+      initialDelaySeconds: 5
+      periodSeconds: 10
+      failureThreshold: 3
+    startup:
+      enabled: false
+      initialDelaySeconds: 0
+      periodSeconds: 5
+      failureThreshold: 30
+  podDisruptionBudget:
+    enabled: false
+    minAvailable: 1
+  autoscaling:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+
+frontend:
+  replicaCount: 1
+  image:
+    repository: ""
+    tag: latest
+    digest: ""
+    pullPolicy: IfNotPresent
+  # LEGACY slot images — rendered only when rollout.enabled=false. REMOVE AFTER ROLLOUT MIGRATION.
+  slots:
+    blue:
+      theme: winter
+      image:
+        repository: ""
+        tag: latest
+        digest: ""
+        pullPolicy: IfNotPresent
+    green:
+      theme: summer
+      image:
+        repository: ""
+        tag: latest
+        digest: ""
+        pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 25m
+      memory: 32Mi
+    limits:
+      cpu: 200m
+      memory: 64Mi
+  probes:
+    path: /healthz
+    liveness:
+      initialDelaySeconds: 10
+      periodSeconds: 20
+      failureThreshold: 3
+    readiness:
+      initialDelaySeconds: 5
+      periodSeconds: 10
+      failureThreshold: 3
+    startup:
+      enabled: false
+      initialDelaySeconds: 0
+      periodSeconds: 5
+      failureThreshold: 30
+  podDisruptionBudget:
+    enabled: false
+    minAvailable: 1
+  autoscaling:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 4
+    targetCPUUtilizationPercentage: 70
+
+networkPolicy:
+  enabled: false
+  dns: true
+  allowAllEgress: true
+  ingress:
+    - from:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 8080
+
+topologySpread:
+  enabled: false
+  maxSkew: 1
+  topologyKey: topology.kubernetes.io/zone
+  whenUnsatisfiable: ScheduleAnyway
+
+podAntiAffinity:
+  enabled: false
+  topologyKey: kubernetes.io/hostname
+
+service:
+  backendPort: 8080
+  frontendPort: 8080
+
+platform:
+  internalDomain: example.internal
+
+  tls:
+    enabled: true
+    secretName: example-internal-wildcard-tls
+    # Hotel references the platform wildcard; it does not create a Certificate by default.
+    certificate:
+      create: false
+      name: example-internal-wildcard
+      issuerRef:
+        name: example-internal-ca
+        kind: ClusterIssuer
+
+  ingress:
+    enabled: true
+    className: traefik
+    entrypoints: websecure
+    host: hotel-dev.example.internal
+    previewHost: hotel-preview-dev.example.internal
+    pathType: Prefix

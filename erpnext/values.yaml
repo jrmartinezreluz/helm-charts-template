@@ -1,0 +1,112 @@
+# Wrapper defaults — override per cluster/env in gitops-platform-template.
+
+cluster:
+  name: cluster-nonprod
+
+frappe:
+  enabled: true
+
+# Values passed to the upstream erpnext subchart (https://helm.erpnext.com)
+erpnext:
+  image:
+    repository: frappe/erpnext
+    tag: v15.51.0
+    digest: ""
+    pullPolicy: IfNotPresent
+
+  replicaCount: 1
+
+  mariadb:
+    enabled: false
+
+  # Upstream chart keys (NOT externalDatabase.*)
+  dbHost: "db.example.internal"
+  dbPort: 3306
+  dbRds: true
+  # Not a usable password. Upstream needs a non-empty string to emit
+  # secretKeyRef to the release Secret populated by ExternalSecret (rds-master).
+  dbRootPassword: "UNSET-REQUIRES-EXTERNAL-SECRET"
+
+  redis-cache:
+    enabled: true
+    architecture: standalone
+    auth:
+      enabled: false
+    image:
+      registry: docker.io
+      repository: bitnamilegacy/redis
+      tag: 7.0.12-debian-11-r19
+    master:
+      persistence:
+        enabled: false
+
+  redis-queue:
+    enabled: true
+    architecture: standalone
+    auth:
+      enabled: false
+    image:
+      registry: docker.io
+      repository: bitnamilegacy/redis
+      tag: 7.0.12-debian-11-r19
+    master:
+      persistence:
+        enabled: false
+
+  persistence:
+    worker:
+      enabled: true
+      size: 10Gi
+      storageClass: local-path
+      accessModes:
+        - ReadWriteOnce
+
+  ingress:
+    enabled: false
+
+  jobs:
+    configure:
+      enabled: false
+    createSite:
+      enabled: false
+      siteBootstrap: false
+      siteName: erpnext-dev.example.internal
+      installApps:
+        - erpnext
+
+platform:
+  internalDomain: example.internal
+
+  tls:
+    enabled: true
+    secretName: example-internal-wildcard-tls
+    certificate:
+      create: true
+      name: example-internal-wildcard
+      issuerRef:
+        name: example-internal-ca
+        kind: ClusterIssuer
+
+  ingress:
+    enabled: true
+    className: traefik
+    entrypoints: websecure
+    host: erpnext-dev.example.internal
+    serviceName: ""
+    servicePort: 8080
+
+  externalSecrets:
+    enabled: true
+    refreshInterval: 1h
+    secretStoreRef:
+      name: aws-secrets-manager
+      kind: ClusterSecretStore
+    db:
+      remoteRef:
+        key: apps/erpnext/dev/db
+    admin:
+      remoteRef:
+        key: apps/erpnext/dev/admin
+    rdsMaster:
+      remoteRef:
+        key: apps/erpnext/rds-master

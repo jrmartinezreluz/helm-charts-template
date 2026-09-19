@@ -1,0 +1,123 @@
+replicaCount: 1
+
+image:
+  repository: public.ecr.aws/docker/library/nginx
+  tag: "1.27-alpine"
+  digest: ""
+  pullPolicy: IfNotPresent
+
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+  automount: false
+
+podSecurityContext:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  # nginx official needs write under /var/cache/nginx unless volumes are added
+  readOnlyRootFilesystem: false
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 80
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+probes:
+  startup:
+    enabled: false
+    path: /
+    initialDelaySeconds: 0
+    periodSeconds: 5
+    failureThreshold: 30
+  liveness:
+    path: /
+    initialDelaySeconds: 15
+    periodSeconds: 20
+    failureThreshold: 3
+  readiness:
+    path: /
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    failureThreshold: 3
+
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+
+networkPolicy:
+  enabled: false
+  dns: true
+  allowAllEgress: true
+  ingress:
+    - from:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 80
+
+topologySpread:
+  enabled: false
+  maxSkew: 1
+  topologyKey: topology.kubernetes.io/zone
+  whenUnsatisfiable: ScheduleAnyway
+
+podAntiAffinity:
+  enabled: false
+  topologyKey: kubernetes.io/hostname
+
+platform:
+  internalDomain: example.internal
+
+  tls:
+    enabled: true
+    secretName: example-internal-wildcard-tls
+    certificate:
+      create: true
+      name: example-internal-wildcard
+      issuerRef:
+        name: example-internal-ca
+        kind: ClusterIssuer
+
+  ingress:
+    enabled: true
+    className: traefik
+    entrypoints: websecure
+    host: app-dev.example.internal
+    path: /
+    pathType: Prefix
+
+  externalSecrets:
+    enabled: false
+    refreshInterval: 1h
+    secretStoreRef:
+      name: aws-secrets-manager
+      kind: ClusterSecretStore
+    remoteRef:
+      key: ""
+
+  envFromSecret: ""

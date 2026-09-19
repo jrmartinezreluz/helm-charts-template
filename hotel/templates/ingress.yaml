@@ -1,0 +1,73 @@
+{{- if .Values.platform.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "hotel.fullname" . }}
+  labels:
+    {{- include "hotel.labels" . | nindent 4 }}
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: {{ .Values.platform.ingress.entrypoints }}
+    traefik.ingress.kubernetes.io/router.tls: "true"
+spec:
+  ingressClassName: {{ .Values.platform.ingress.className }}
+  {{- if .Values.platform.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ .Values.platform.ingress.host }}
+      secretName: {{ .Values.platform.tls.secretName }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.platform.ingress.host }}
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "hotel.fullname" . }}-backend
+                port:
+                  number: {{ .Values.service.backendPort }}
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "hotel.fullname" . }}-frontend-active
+                port:
+                  number: {{ .Values.service.frontendPort }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "hotel.fullname" . }}-preview
+  labels:
+    {{- include "hotel.labels" . | nindent 4 }}
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: {{ .Values.platform.ingress.entrypoints }}
+    traefik.ingress.kubernetes.io/router.tls: "true"
+spec:
+  ingressClassName: {{ .Values.platform.ingress.className }}
+  {{- if .Values.platform.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ .Values.platform.ingress.previewHost }}
+      secretName: {{ .Values.platform.tls.secretName }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.platform.ingress.previewHost }}
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "hotel.fullname" . }}-backend
+                port:
+                  number: {{ .Values.service.backendPort }}
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "hotel.fullname" . }}-frontend-preview
+                port:
+                  number: {{ .Values.service.frontendPort }}
+{{- end }}

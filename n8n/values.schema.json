@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "replicaCount": { "type": "integer", "minimum": 0 },
+    "image": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "repository": { "type": "string" },
+        "tag": { "type": ["string", "number"] },
+        "digest": { "type": "string" },
+        "pullPolicy": { "type": "string" }
+      }
+    },
+    "autoscaling": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": { "enabled": { "type": "boolean" } }
+    },
+    "podDisruptionBudget": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": { "enabled": { "type": "boolean" } }
+    },
+    "platform": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "ingress": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": { "host": { "type": "string" } }
+        }
+      }
+    }
+  }
+}

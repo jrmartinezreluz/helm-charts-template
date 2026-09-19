@@ -1,0 +1,1 @@
+{{- include "arkhadia-common.pdb.manifest" (dict "ctx" . "name" (printf "%s-backend" (include "hotel.fullname" .)) "selectorLabels" (include "hotel.backendSelectorLabels" .) "pdb" .Values.backend.podDisruptionBudget) }}

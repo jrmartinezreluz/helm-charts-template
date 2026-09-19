@@ -1,0 +1,1 @@
+{{- include "arkhadia-common.networkPolicy.manifest" (dict "ctx" . "selectorLabels" (include "generic-web.selectorLabels" .)) }}

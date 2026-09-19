@@ -1,0 +1,170 @@
+{{- $site := .Values.erpnext.jobs.createSite }}
+{{- if $site.siteBootstrap }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-new-site-{{ now | date "20060102150405" }}
+  labels:
+    {{- include "erpnext-platform.labels" . | nindent 4 }}
+    app.kubernetes.io/component: create-site
+spec:
+  backoffLimit: {{ default 0 $site.backoffLimit }}
+  template:
+    spec:
+    {{- with .Values.erpnext.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+      serviceAccountName: {{ .Release.Name }}
+      securityContext:
+        {{- toYaml .Values.erpnext.podSecurityContext | nindent 8 }}
+      initContainers:
+        - name: validate-config
+          image: "{{ include "arkhadia-common.image" .Values.erpnext.image }}"
+          imagePullPolicy: {{ .Values.erpnext.image.pullPolicy }}
+          command: ["bash", "-c"]
+          args:
+            - >
+              export start=`date +%s`;
+              until [[ -n `grep -hs ^ sites/common_site_config.json | jq -r ".db_host // empty"` ]] &&
+                [[ -n `grep -hs ^ sites/common_site_config.json | jq -r ".redis_cache // empty"` ]] &&
+                [[ -n `grep -hs ^ sites/common_site_config.json | jq -r ".redis_queue // empty"` ]];
+              do
+                echo "Waiting for sites/common_site_config.json to be created";
+                sleep 5;
+                if (( `date +%s`-start > 600 )); then
+                  echo "could not find sites/common_site_config.json with required keys";
+                  exit 1
+                fi
+              done;
+              echo "sites/common_site_config.json found";
+              echo "Waiting for database to be reachable...";
+              wait-for-it -t 180 $(DB_HOST):$(DB_PORT);
+              echo "Database is reachable.";
+          env:
+            - name: DB_HOST
+              value: {{ .Values.erpnext.dbHost | quote }}
+            - name: DB_PORT
+              value: {{ .Values.erpnext.dbPort | quote }}
+          resources:
+            {{- toYaml $site.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.erpnext.securityContext | nindent 12 }}
+          volumeMounts:
+            - name: sites-dir
+              mountPath: /home/frappe/frappe-bench/sites
+      containers:
+        - name: create-site
+          image: "{{ include "arkhadia-common.image" .Values.erpnext.image }}"
+          imagePullPolicy: {{ .Values.erpnext.image.pullPolicy }}
+          command: ["bash", "-c"]
+          args:
+            - |
+              set -x
+              bench_output=$(bench new-site "${SITE_NAME}" \
+                --mariadb-user-host-login-scope='%' \
+                --db-type="${DB_TYPE}" \
+                --db-host="${DB_HOST}" \
+                --db-port="${DB_PORT}" \
+                --db-name="${DB_NAME}" \
+                --db-password="${DB_PASSWORD}" \
+                --admin-password="${ADMIN_PASSWORD}" \
+                --mariadb-root-username="${DB_ROOT_USER}" \
+                --mariadb-root-password="${DB_ROOT_PASSWORD}" \
+              {{- range $site.installApps }}
+                --install-app={{ . }} \
+              {{- end }}
+              {{- if $site.forceCreate }}
+                --force \
+              {{- end }}
+                2>&1 | tee /dev/stderr)
+              bench_exit_status=${PIPESTATUS[0]}
+              if [[ "${bench_output}" == *"already exists"* ]] || [ "${bench_exit_status}" -ne 0 ]; then
+                if bench --site "${SITE_NAME}" list-apps 2>/dev/null | grep -q erpnext; then
+                  echo "Site already exists and erpnext is installed, continuing..."
+                else
+                  echo "Site incomplete — reinstalling with --force"
+                  bench new-site "${SITE_NAME}" \
+                    --force \
+                    --mariadb-user-host-login-scope='%' \
+                    --db-type="${DB_TYPE}" \
+                    --db-host="${DB_HOST}" \
+                    --db-port="${DB_PORT}" \
+                    --db-name="${DB_NAME}" \
+                    --db-password="${DB_PASSWORD}" \
+                    --admin-password="${ADMIN_PASSWORD}" \
+                    --mariadb-root-username="${DB_ROOT_USER}" \
+                    --mariadb-root-password="${DB_ROOT_PASSWORD}" \
+                  {{- range $site.installApps }}
+                    --install-app={{ . }} \
+                  {{- end }}
+                    || exit 1
+                fi
+              elif [ "${bench_exit_status}" -ne 0 ]; then
+                echo "An error occurred in bench new-site: ${bench_output}"
+                exit "${bench_exit_status}"
+              fi
+              rm -f currentsite.txt
+          env:
+            - name: SITE_NAME
+              value: {{ $site.siteName | quote }}
+            - name: DB_TYPE
+              value: {{ default "mariadb" $site.dbType | quote }}
+            - name: DB_HOST
+              value: {{ .Values.erpnext.dbHost | quote }}
+            - name: DB_PORT
+              value: {{ .Values.erpnext.dbPort | quote }}
+            - name: DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: erpnext-db-credentials
+                  key: db-name
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: erpnext-db-credentials
+                  key: db-password
+            - name: DB_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}
+                  key: db-root-username
+            - name: DB_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}
+                  key: db-root-password
+            - name: ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: erpnext-admin-credentials
+                  key: admin-password
+          resources:
+            {{- toYaml $site.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.erpnext.securityContext | nindent 12 }}
+          volumeMounts:
+            - name: sites-dir
+              mountPath: /home/frappe/frappe-bench/sites
+            - name: logs
+              mountPath: /home/frappe/frappe-bench/logs
+      restartPolicy: Never
+      volumes:
+        - name: sites-dir
+          persistentVolumeClaim:
+            claimName: {{ .Release.Name }}
+        - name: logs
+          emptyDir: {}
+      {{- with $site.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $site.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $site.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

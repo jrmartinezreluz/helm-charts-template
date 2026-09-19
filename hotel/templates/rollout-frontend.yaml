@@ -1,0 +1,70 @@
+{{- if include "hotel.rolloutEnabled" . }}
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: {{ include "hotel.fullname" . }}-frontend
+  labels:
+    {{- include "hotel.labels" . | nindent 4 }}
+    app.kubernetes.io/component: frontend
+spec:
+  replicas: {{ .Values.frontend.replicaCount }}
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      {{- include "hotel.frontendSelectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "hotel.frontendSelectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "arkhadia-common.serviceAccountName" . }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automount | default false }}
+      securityContext:
+        {{- include "arkhadia-common.podSecurityContext" . | nindent 8 }}
+      {{- include "arkhadia-common.topologySpread" (dict "ctx" . "selectorLabels" (include "hotel.frontendSelectorLabels" .)) | nindent 6 }}
+      containers:
+        - name: frontend
+          image: "{{ include "arkhadia-common.image" .Values.frontend.image }}"
+          imagePullPolicy: {{ .Values.frontend.image.pullPolicy | default "IfNotPresent" }}
+          securityContext:
+            {{- include "arkhadia-common.containerSecurityContext" . | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.frontendPort }}
+          {{- if .Values.frontend.probes.startup.enabled }}
+          startupProbe:
+            httpGet:
+              path: {{ .Values.frontend.probes.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.frontend.probes.startup.initialDelaySeconds }}
+            periodSeconds: {{ .Values.frontend.probes.startup.periodSeconds }}
+            failureThreshold: {{ .Values.frontend.probes.startup.failureThreshold }}
+          {{- end }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.frontend.probes.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.frontend.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.frontend.probes.liveness.periodSeconds }}
+            failureThreshold: {{ .Values.frontend.probes.liveness.failureThreshold }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.frontend.probes.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.frontend.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.frontend.probes.readiness.periodSeconds }}
+            failureThreshold: {{ .Values.frontend.probes.readiness.failureThreshold }}
+          resources:
+            {{- toYaml .Values.frontend.resources | nindent 12 }}
+  strategy:
+    blueGreen:
+      activeService: {{ include "hotel.fullname" . }}-frontend-active
+      previewService: {{ include "hotel.fullname" . }}-frontend-preview
+      autoPromotionEnabled: {{ .Values.rollout.autoPromotionEnabled }}
+      {{- with .Values.rollout.scaleDownDelaySeconds }}
+      scaleDownDelaySeconds: {{ . }}
+      {{- end }}
+      {{- with .Values.rollout.previewReplicaCount }}
+      previewReplicaCount: {{ . }}
+      {{- end }}
+{{- end }}

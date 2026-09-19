@@ -1,0 +1,10 @@
+apiVersion: v2
+name: arkhadia-common
+description: Shared Helm helpers (labels, SA, PDB, NetworkPolicy, HPA, TLS, ESO, security, metrics). Does not install resources by itself.
+type: library
+version: 0.1.1
+keywords:
+  - arkhadia
+  - library
+sources:
+  - https://github.com/example-org/helm-charts-template

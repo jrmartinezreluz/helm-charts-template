@@ -1,0 +1,1 @@
+{{- include "arkhadia-common.hpa.manifest" (dict "ctx" . "name" (printf "%s-backend" (include "hotel.fullname" .)) "targetName" (printf "%s-backend" (include "hotel.fullname" .)) "autoscaling" .Values.backend.autoscaling) }}

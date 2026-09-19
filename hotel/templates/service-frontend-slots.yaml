@@ -1,0 +1,23 @@
+{{- if not (include "hotel.rolloutEnabled" .) }}
+{{/* REMOVE AFTER ROLLOUT MIGRATION — per-slot Services are unused when rollout.enabled */}}
+{{- range $slot, $cfg := .Values.frontend.slots }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "hotel.fullname" $ }}-frontend-{{ $slot }}
+  labels:
+    {{- include "hotel.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: frontend
+    hotel/slot: {{ $slot }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "hotel.frontendSelectorLabels" $ | nindent 4 }}
+    hotel/slot: {{ $slot }}
+  ports:
+    - name: http
+      port: {{ $.Values.service.frontendPort }}
+      targetPort: http
+---
+{{- end }}
+{{- end }}

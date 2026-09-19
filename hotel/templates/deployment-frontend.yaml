@@ -1,0 +1,73 @@
+{{- if not (include "hotel.rolloutEnabled" .) }}
+{{- $active := include "hotel.activeSlot" . }}
+{{- range $slot, $cfg := .Values.frontend.slots }}
+{{- $traffic := ternary "active" "preview" (eq $slot $active) }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "hotel.fullname" $ }}-frontend-{{ $slot }}
+  labels:
+    {{- include "hotel.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: frontend
+    hotel/slot: {{ $slot }}
+    hotel/traffic: {{ $traffic }}
+    hotel/theme: {{ $cfg.theme }}
+  annotations:
+    hotel.example/description: "LEGACY Frontend slot={{ $slot }} traffic={{ $traffic }} theme={{ $cfg.theme }}"
+spec:
+  replicas: {{ $.Values.frontend.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "hotel.frontendSelectorLabels" $ | nindent 6 }}
+      hotel/slot: {{ $slot }}
+  template:
+    metadata:
+      labels:
+        {{- include "hotel.frontendSelectorLabels" $ | nindent 8 }}
+        hotel/slot: {{ $slot }}
+        hotel/traffic: {{ $traffic }}
+        hotel/theme: {{ $cfg.theme }}
+      annotations:
+        hotel.example/description: "LEGACY Frontend slot={{ $slot }} traffic={{ $traffic }}"
+    spec:
+      serviceAccountName: {{ include "arkhadia-common.serviceAccountName" $ }}
+      automountServiceAccountToken: {{ $.Values.serviceAccount.automount | default false }}
+      securityContext:
+        {{- include "arkhadia-common.podSecurityContext" $ | nindent 8 }}
+      containers:
+        - name: frontend
+          image: "{{ include "arkhadia-common.image" $cfg.image }}"
+          imagePullPolicy: {{ $cfg.image.pullPolicy | default "IfNotPresent" }}
+          securityContext:
+            {{- include "arkhadia-common.containerSecurityContext" $ | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: {{ $.Values.service.frontendPort }}
+          {{- if $.Values.frontend.probes.startup.enabled }}
+          startupProbe:
+            httpGet:
+              path: {{ $.Values.frontend.probes.path }}
+              port: http
+            initialDelaySeconds: {{ $.Values.frontend.probes.startup.initialDelaySeconds }}
+            periodSeconds: {{ $.Values.frontend.probes.startup.periodSeconds }}
+            failureThreshold: {{ $.Values.frontend.probes.startup.failureThreshold }}
+          {{- end }}
+          livenessProbe:
+            httpGet:
+              path: {{ $.Values.frontend.probes.path }}
+              port: http
+            initialDelaySeconds: {{ $.Values.frontend.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ $.Values.frontend.probes.liveness.periodSeconds }}
+            failureThreshold: {{ $.Values.frontend.probes.liveness.failureThreshold }}
+          readinessProbe:
+            httpGet:
+              path: {{ $.Values.frontend.probes.path }}
+              port: http
+            initialDelaySeconds: {{ $.Values.frontend.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ $.Values.frontend.probes.readiness.periodSeconds }}
+            failureThreshold: {{ $.Values.frontend.probes.readiness.failureThreshold }}
+          resources:
+            {{- toYaml $.Values.frontend.resources | nindent 12 }}
+---
+{{- end }}
+{{- end }}

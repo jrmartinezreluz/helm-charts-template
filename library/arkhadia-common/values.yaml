@@ -1,0 +1,88 @@
+# Documented keys consumed by named templates when an application chart
+# includes this library. This file is not installed.
+#
+# Application charts must pin this chart version in Chart.yaml:
+#   dependencies:
+#     - name: arkhadia-common
+#       version: 0.1.1
+#       repository: "file://../library/arkhadia-common"
+#
+# GitOps overlays (global / application / gitops) are optional.
+
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+  automount: false
+
+podSecurityContext:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+
+networkPolicy:
+  enabled: false
+  policyTypes:
+    - Ingress
+    - Egress
+  dns: true
+  # 10B: do not default to allow-all egress. Charts that need it (n8n) set true explicitly.
+  allowAllEgress: false
+  ingress: []
+  egress: []
+
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+
+topologySpread:
+  enabled: false
+  maxSkew: 1
+  topologyKey: topology.kubernetes.io/zone
+  whenUnsatisfiable: ScheduleAnyway
+
+podAntiAffinity:
+  enabled: false
+  topologyKey: kubernetes.io/hostname
+
+# 10C application observability contract. Off by default; charts opt in.
+metrics:
+  enabled: false
+  port: 8080
+  path: /metrics
+  portName: http-metrics
+
+serviceMonitor:
+  enabled: false
+  interval: 30s
+  scrapeTimeout: 10s
+  additionalLabels: {}
+
+prometheusRule:
+  enabled: false
+  additionalLabels: {}
+  groups: []
+
+dashboard:
+  enabled: false
+  folder: Platform
+  json: ""
+
+# Structured logging / tracing are documentation contracts (see docs/phase10).
+# correlationHeader: X-Request-ID
+# otlp.endpoint: unset until a collector exists

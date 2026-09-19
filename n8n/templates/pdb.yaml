@@ -1,0 +1,1 @@
+{{- include "arkhadia-common.pdb.manifest" (dict "ctx" . "selectorLabels" (include "n8n-platform.n8nSelectorLabels" .)) }}
